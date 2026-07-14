@@ -188,6 +188,20 @@ the webframeworks enabled will take a couple of hours to run.
 All the graphs are generated automatically as the `./test.sh` finishes. However, if the run was interrupted, you can
 generate them manually of partial data by executing `plot.sh` in testresults directory.
 
+### Interactive HTML charts
+In addition to the static PNGs, an interactive HTML view is generated from the same CSV data — no gnuplot required to
+view it. It lets you hover for exact per-framework values, toggle frameworks via the legend, and switch between bar and
+line charts, which makes crowded results much easier to read.
+
+Open `testresults/index.html` in a browser, or regenerate it after a run:
+
+```
+cd testresults
+go run ./genhtml
+```
+
+`plot.sh` / `plot_mac.sh` already invoke it as their last step, so it stays in sync with the PNGs.
+
 ### Add new web framework
 Welcome to add new Go web frameworks. You can follow the below steps and send me a pull request.
 

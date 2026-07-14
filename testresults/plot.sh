@@ -18,4 +18,7 @@ gnuplot  concurrency_pipeline.gnu
 gnuplot  cpubound_benchmark.gnu
 gnuplot  cpubound_concurrency.gnu
 
+# Also generate an interactive HTML view (no gnuplot needed to view it).
+go run ./genhtml
+
 rm -fr t_*.csv

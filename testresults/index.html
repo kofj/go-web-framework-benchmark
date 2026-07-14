@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Go Web Framework Benchmark</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  :root[data-theme="light"] {
+    --bg: #f7f8fa; --panel: #ffffff; --border: #e4e7ec; --shadow: 0 1px 3px rgba(16,24,40,.06);
+    --text: #101828; --muted: #667085; --accent: #4f46e5; --badge: #f2f4f7; --grid: #eceff3;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0f1420; --panel: #1a2233; --border: #2a3448; --shadow: none;
+    --text: #e6edf3; --muted: #8b98ac; --accent: #7c9cff; --badge: #232d40; --grid: #2a3448;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+  }
+  header { max-width: 1400px; margin: 0 auto; padding: 32px 24px 8px; text-align: center; }
+  h1 { margin: 0 0 6px; font-size: 24px; }
+  header p { margin: 0; color: var(--muted); font-size: 14px; }
+  .updated {
+    display: inline-block; margin-top: 12px; padding: 5px 12px; font-size: 12.5px;
+    color: var(--muted); background: var(--badge); border: 1px solid var(--border); border-radius: 999px;
+  }
+  .controls {
+    max-width: 1400px; margin: 0 auto; padding: 20px 24px 8px;
+    display: flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-content: center;
+  }
+  .group { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .group button { border: 0; border-radius: 0; }
+  .group button + button { border-left: 1px solid var(--border); }
+  .controls .lbl { color: var(--muted); font-size: 13px; margin-right: 2px; }
+  button {
+    background: var(--panel); color: var(--text); border: 1px solid var(--border);
+    border-radius: 8px; padding: 8px 14px; font-size: 13.5px; cursor: pointer;
+  }
+  button.active { background: var(--accent); color: #fff; }
+  .grid {
+    max-width: 1400px; margin: 0 auto; padding: 12px 24px 48px;
+    display: grid; grid-template-columns: 1fr; gap: 24px;
+  }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 18px 22px 12px; box-shadow: var(--shadow); }
+  .card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .card h2 { margin: 0; font-size: 17px; }
+  .badges { display: flex; gap: 6px; }
+  .badge { font-size: 11.5px; color: var(--muted); background: var(--badge); border: 1px solid var(--border); border-radius: 6px; padding: 2px 8px; }
+  .card .sub { margin: 4px 0 12px; color: var(--muted); font-size: 12.5px; }
+  .chart-wrap { position: relative; height: 460px; }
+  footer { max-width: 1400px; margin: 0 auto; padding: 0 24px 40px; text-align: center; color: var(--muted); font-size: 12.5px; }
+  a { color: var(--accent); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Go Web Framework Benchmark</h1>
+  <p>Performance comparison of Go web frameworks</p>
+  <div class="updated">Updated: <strong id="updated"></strong></div>
+</header>
+
+<div class="controls">
+  <span class="lbl">Chart</span>
+  <div class="group">
+    <button id="btnBar">Bar</button>
+    <button id="btnLine" class="active">Line</button>
+  </div>
+  <span class="lbl">Y scale</span>
+  <div class="group">
+    <button id="btnLinear" class="active">Linear</button>
+    <button id="btnLog">Log</button>
+  </div>
+  <span class="lbl">Sort</span>
+  <div class="group">
+    <button id="btnSortNone" class="active">None</button>
+    <button id="btnSortAsc">Asc</button>
+    <button id="btnSortDesc">Desc</button>
+  </div>
+  <button id="btnTheme" title="Toggle theme">🌙</button>
+</div>
+
+<div class="grid" id="grid"></div>
+
+<footer>
+  Generated from the CSV files in <code>testresults/</code> by <code>go run ./genhtml</code>
+  (no gnuplot required). Styled after <a href="https://vizb.goptics.org">Vizb</a>. Source:
+  <a href="https://github.com/smallnest/go-web-framework-benchmark">go-web-framework-benchmark</a>.
+</footer>
+
+<script>
+const FRAMEWORKS = ["default","chi","echo","gin","goframe","httpz"];
+const DATASETS = [
+  {
+    "id": "processtime",
+    "title": "Processing time",
+    "sub": "requests / second (higher is better)",
+    "unit": "req/s",
+    "labels": [
+      "0 ms",
+      "10 ms",
+      "100 ms",
+      "500 ms"
+    ],
+    "rows": [
+      [
+        120770.06,
+        120367.94,
+        124727.97,
+        124419.16,
+        116549.53,
+        123579.56
+      ],
+      [
+        116210.81,
+        115965.84,
+        117805.31,
+        118851.87,
+        110629.52,
+        117960.15
+      ],
+      [
+        49373.54,
+        49338.11,
+        49375.19,
+        49374.1,
+        49346.7,
+        49357.26
+      ],
+      [
+        9800.42,
+        9800.55,
+        9804.25,
+        9801.69,
+        9801.51,
+        9801.15
+      ]
+    ],
+    "frameworks": [
+      "default",
+      "chi",
+      "echo",
+      "gin",
+      "goframe",
+      "httpz"
+    ]
+  },
+  {
+    "id": "processtime_latency",
+    "title": "Processing time — Latency",
+    "sub": "millisecond (lower is better)",
+    "unit": "ms",
+    "labels": [
+      "0 ms",
+      "10 ms",
+      "100 ms",
+      "500 ms"
+    ],
+    "rows": [
+      [
+        40.49,
+        40.7,
+        39.24,
+        39.22,
+        41.98,
+        39.54
+      ],
+      [
+        43.64,
+        43.24,
+        42.83,
+        41.99,
+        44.96,
+        42.82
+      ],
+      [
+        100.83,
+        100.88,
+        100.81,
+        100.83,
+        100.84,
+        100.83
+      ],
+      [
+        501.16,
+        501.32,
+        501.4,
+        501.27,
+        501.32,
+        501.16
+      ]
+    ],
+    "frameworks": [
+      "default",
+      "chi",
+      "echo",
+      "gin",
+      "goframe",
+      "httpz"
+    ]
+  },
+  {
+    "id": "processtime_alloc",
+    "title": "Processing time — Allocations",
+    "sub": "MB (lower is better)",
+    "unit": "MB",
+    "labels": [
+      "0 ms",
+      "10 ms",
+      "100 ms",
+      "500 ms"
+    ],
+    "rows": [
+      [
+        113,
+        92,
+        97,
+        106,
+        92,
+        109
+      ],
+      [
+        120,
+        96,
+        123,
+        97,
+        123,
+        112
+      ],
+      [
+        118,
+        101,
+        98,
+        95,
+        136,
+        100
+      ],
+      [
+        76,
+        131,
+        79,
+        84,
+        120,
+        123
+      ]
+    ],
+    "frameworks": [
+      "default",
+      "chi",
+      "echo",
+      "gin",
+      "goframe",
+      "httpz"
+    ]
+  },
+  {
+    "id": "processtime_pipeline",
+    "title": "Processing time — Pipelining",
+    "sub": "requests / second (higher is better)",
+    "unit": "req/s",
+    "labels": [
+      "0 ms",
+      "10 ms",
+      "100 ms",
+      "500 ms"
+    ],
+    "rows": [
+      [
+        151731.17,
+        147921.76,
+        154685.14,
+        154814.18,
+        141616.29,
+        152668.73
+      ],
+      [
+        144215.95,
+        140200.34,
+        144333.58,
+        146462.5,
+        134531.35,
+        144914.32
+      ],
+      [
+        49372.16,
+        49374.53,
+        49389.27,
+        49385.28,
+        49363.96,
+        49356.72
+      ],
+      [
+        9812.85,
+        9800.71,
+        9814.06,
+        9813.04,
+        9830.48,
+        9816.31
+      ]
+    ],
+    "frameworks": [
+      "default",
+      "chi",
+      "echo",
+      "gin",
+      "goframe",
+      "httpz"
+    ]
+  },
+  {
+    "id": "concurrency",
+    "title": "Concurrency (30ms)",
+    "sub": "requests / second (higher is better)",
+    "unit": "req/s",
+    "labels": [
+      "100",
+      "1000",
+      "5000"
+    ],
+    "rows": [
+      [
+        3103.62,
+        3103.73,
+        3104.59,
+        3103.72,
+        3114.2,
+        3105.1
+      ],
+      [
+        32423.67,
+        32421.28,
+        32413.72,
+        32408.85,
+        32411.78,
+        32413.1
+      ],
+      [
+        120057.1,
+        111899.8,
+        114180.37,
+        114503.28,
+        108866.64,
+        113671.85
+      ]
+    ],
+    "frameworks": [
+      "default",
+      "chi",
+      "echo",
+      "gin",
+      "goframe",
+      "httpz"
+    ]
+  },
+  {
+    "id": "concurrency_latency",
+    "title": "Concurrency — Latency",
+    "sub": "millisecond (lower is better)",
+    "unit": "ms",
+    "labels": [
+      "100",
+      "1000",
+      "5000"
+    ],
+    "rows": [
+      [
+        30.9,
+        30.9,
+        30.89,
+        30.88,
+        30.78,
+        30.89
+      ],
+      [
+        30.73,
+        30.74,
+        30.74,
+        30.73,
+        30.76,
+        30.73
+      ],
+      [
+        41.09,
+        44.13,
+        43.23,
+        43.18,
+        45.27,
+        43.46
+      ]
+    ],
+    "frameworks": [
+      "default",
+      "chi",
+      "echo",
+      "gin",
+      "goframe",
+      "httpz"
+    ]
+  },
+  {
+    "id": "concurrency_alloc",
+    "title": "Concurrency — Allocations",
+    "sub": "MB (lower is better)",
+    "unit": "MB",
+    "labels": [
+      "100",
+      "1000",
+      "5000"
+    ],
+    "rows": [
+      [
+        11,
+        6,
+        10,
+        7,
+        11,
+        7
+      ],
+      [
+        22,
+        35,
+        30,
+        31,
+        21,
+        25
+      ],
+      [
+        144,
+        132,
+        97,
+        151,
+        130,
+        117
+      ]
+    ],
+    "frameworks": [
+      "default",
+      "chi",
+      "echo",
+      "gin",
+      "goframe",
+      "httpz"
+    ]
+  },
+  {
+    "id": "concurrency_pipeline",
+    "title": "Concurrency — Pipelining",
+    "sub": "requests / second (higher is better)",
+    "unit": "req/s",
+    "labels": [
+      "100",
+      "1000",
+      "5000"
+    ],
+    "rows": [
+      [
+        3113.88,
+        3113.87,
+        3116.27,
+        3113.01,
+        3110.66,
+        3113.8
+      ],
+      [
+        32543.4,
+        32513.29,
+        32525.21,
+        32525.93,
+        32499.82,
+        32528.43
+      ],
+      [
+        148368.67,
+        142903.62,
+        145767.53,
+        146513.37,
+        137985.84,
+        145334.3
+      ]
+    ],
+    "frameworks": [
+      "default",
+      "chi",
+      "echo",
+      "gin",
+      "goframe",
+      "httpz"
+    ]
+  },
+  {
+    "id": "cpubound_concurrency",
+    "title": "CPU-bound — Concurrency",
+    "sub": "requests / second (higher is better)",
+    "unit": "req/s",
+    "labels": [
+      "100",
+      "1000",
+      "5000"
+    ],
+    "rows": [
+      [
+        1663.74,
+        1662.4,
+        1668.58,
+        1679.62,
+        1676.21,
+        1689.65
+      ],
+      [
+        1654.67,
+        1652.65,
+        1667.48,
+        1662.35,
+        1664.01,
+        1662.96
+      ],
+      [
+        1579.48,
+        1552.99,
+        1645.13,
+        1602.77,
+        1610.72,
+        1659.99
+      ]
+    ],
+    "frameworks": [
+      "default",
+      "chi",
+      "echo",
+      "gin",
+      "goframe",
+      "httpz"
+    ]
+  },
+  {
+    "id": "cpubound",
+    "title": "CPU-bound",
+    "sub": "requests / second (higher is better)",
+    "unit": "req/s",
+    "labels": [
+      "cpu-bound"
+    ],
+    "rows": [
+      [
+        1603.56,
+        1525.2,
+        1536.86,
+        1511.77,
+        1582.87,
+        1615.46
+      ]
+    ],
+    "frameworks": [
+      "default",
+      "chi",
+      "echo",
+      "gin",
+      "goframe",
+      "httpz"
+    ]
+  }
+];
+
+
+
+
+const BASE = ["#4f46e5","#f97066","#12b76a","#f79009","#9e77ed","#ee46bc","#06aed4","#fb6514","#66c61c","#e31b54"];
+const colorCache = {};
+function colorFor(i) {
+  if (i < BASE.length) return BASE[i];
+  if (colorCache[i]) return colorCache[i];
+  const hue = (i * 137.508) % 360;                 
+  const sat = 62 + (i % 3) * 8;                    
+  const light = 52 + (i % 2) * 8;
+  return (colorCache[i] = "hsl(" + hue.toFixed(0) + " " + sat + "% " + light + "%)");
+}
+
+let chartType = "line";
+let yScale = "linear";
+let sort = "none";      
+const charts = [];
+
+
+
+function orderFor(ds) {
+  const idx = ds.frameworks.map((_, i) => i);
+  if (sort === "none") return idx;
+  const mean = i => ds.rows.reduce((s, r) => s + r[i], 0) / ds.rows.length;
+  return idx.sort((a, b) => sort === "asc" ? mean(a) - mean(b) : mean(b) - mean(a));
+}
+
+function seriesFor(ds) {
+  return orderFor(ds).map((fi, pos) => ({
+    label: ds.frameworks[fi],
+    data: ds.rows.map(r => r[fi]),
+    backgroundColor: colorFor(fi),
+    borderColor: colorFor(fi),
+    borderWidth: 2, tension: 0.25, pointRadius: 2.5,
+  }));
+}
+
+function cssVar(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+
+function buildCharts() {
+  const grid = document.getElementById("grid");
+  grid.innerHTML = "";
+  charts.length = 0;
+  Chart.defaults.color = cssVar("--muted");
+  Chart.defaults.borderColor = cssVar("--grid");
+
+  DATASETS.forEach(ds => {
+    const card = document.createElement("div");
+    card.className = "card";
+    card.innerHTML =
+      '<div class="card-head"><h2>' + ds.title + '</h2>' +
+      '<div class="badges"><span class="badge">Series: ' + ds.frameworks.length + '</span></div></div>' +
+      '<p class="sub">' + ds.sub + '</p><div class="chart-wrap"><canvas></canvas></div>';
+    grid.appendChild(card);
+
+    const ctx = card.querySelector("canvas");
+    
+    
+    const many = ds.frameworks.length > 12;
+    charts.push(new Chart(ctx, {
+      type: chartType,
+      data: { labels: ds.labels, datasets: seriesFor(ds) },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        interaction: many ? { mode: "nearest", intersect: false }
+                          : { mode: "index", intersect: false },
+        plugins: {
+          legend: { position: "top", labels: { boxWidth: 8, usePointStyle: true, pointStyle: "circle", padding: 8, font: { size: 11 } } },
+          tooltip: { callbacks: { label: c => c.dataset.label + ": " + c.parsed.y.toLocaleString() + " " + ds.unit } }
+        },
+        scales: {
+          y: {
+            type: yScale, beginAtZero: yScale === "linear",
+            grid: { color: cssVar("--grid") },
+            ticks: { callback: v => Number(v).toLocaleString() }
+          },
+          x: { grid: { display: false } }
+        }
+      }
+    }));
+  });
+}
+
+function bind(id, fn) { document.getElementById(id).onclick = fn; }
+function activate(ids, on) { ids.forEach(i => document.getElementById(i).classList.toggle("active", i === on)); }
+
+bind("btnBar",  () => { chartType = "bar";  activate(["btnBar","btnLine"], "btnBar");  buildCharts(); });
+bind("btnLine", () => { chartType = "line"; activate(["btnBar","btnLine"], "btnLine"); buildCharts(); });
+bind("btnLinear", () => { yScale = "linear";      activate(["btnLinear","btnLog"], "btnLinear"); buildCharts(); });
+bind("btnLog",    () => { yScale = "logarithmic"; activate(["btnLinear","btnLog"], "btnLog");    buildCharts(); });
+bind("btnSortNone", () => { sort = "none"; activate(["btnSortNone","btnSortAsc","btnSortDesc"], "btnSortNone"); buildCharts(); });
+bind("btnSortAsc",  () => { sort = "asc";  activate(["btnSortNone","btnSortAsc","btnSortDesc"], "btnSortAsc");  buildCharts(); });
+bind("btnSortDesc", () => { sort = "desc"; activate(["btnSortNone","btnSortAsc","btnSortDesc"], "btnSortDesc"); buildCharts(); });
+bind("btnTheme", () => {
+  const root = document.documentElement;
+  const dark = root.getAttribute("data-theme") === "dark";
+  root.setAttribute("data-theme", dark ? "light" : "dark");
+  document.getElementById("btnTheme").textContent = dark ? "🌙" : "☀️";
+  buildCharts();
+});
+
+document.getElementById("updated").textContent =
+  new Date().toLocaleString(undefined, { year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+buildCharts();
+</script>
+</body>
+</html>
