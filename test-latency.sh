@@ -10,8 +10,8 @@ test_result=()
 test_latency_result=()
 test_alloc_result=()
 
-cpu_cores=$(< "/proc/cpuinfo" grep -c processor)
-if [ $cpu_cores -eq 0 ]
+cpu_cores=$( (nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || getconf _NPROCESSORS_ONLN 2>/dev/null) )
+if [ -z "$cpu_cores" ] || [ "$cpu_cores" -eq 0 ]
 then
   cpu_cores=1
 fi
